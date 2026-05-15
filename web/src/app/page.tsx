@@ -3,6 +3,8 @@
 import { useCallback, useRef, useState } from "react";
 import {
   CHECK_LABELS,
+  DIMENSION_LABEL,
+  evaluateDimensions,
   type CheckKey,
   type CheckStatus,
   type PhotoCheckResult,
@@ -12,11 +14,41 @@ import { STRINGS, type Locale } from "@/lib/i18n";
 const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+interface CheckResult {
+  status: CheckStatus;
+  note: string;
+}
+
+async function measureDimensions(
+  file: File,
+  locale: Locale,
+): Promise<CheckResult> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const result = evaluateDimensions(bitmap.width, bitmap.height, locale);
+    bitmap.close();
+    return result;
+  } catch {
+    return {
+      status: "warning",
+      note:
+        locale === "zh"
+          ? "无法读取图片尺寸。"
+          : "Could not read image dimensions.",
+    };
+  }
+}
+
 type Phase =
   | { kind: "idle" }
   | { kind: "preview"; previewUrl: string; file: File }
   | { kind: "loading"; previewUrl: string }
-  | { kind: "result"; previewUrl: string; result: PhotoCheckResult }
+  | {
+      kind: "result";
+      previewUrl: string;
+      result: PhotoCheckResult;
+      dimensions: CheckResult;
+    }
   | { kind: "error"; previewUrl: string | null; message: string };
 
 const STATUS_STYLES: Record<CheckStatus, string> = {
@@ -61,6 +93,8 @@ export default function PhotoCheckerPage() {
       const previewUrl = URL.createObjectURL(file);
       setPhase({ kind: "loading", previewUrl });
 
+      const dimensionsPromise = measureDimensions(file, locale);
+
       const fd = new FormData();
       fd.append("photo", file);
       fd.append("locale", locale);
@@ -80,7 +114,8 @@ export default function PhotoCheckerPage() {
           return;
         }
         const result = (await res.json()) as PhotoCheckResult;
-        setPhase({ kind: "result", previewUrl, result });
+        const dimensions = await dimensionsPromise;
+        setPhase({ kind: "result", previewUrl, result, dimensions });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Network error";
         setPhase({ kind: "error", previewUrl, message });
@@ -149,7 +184,12 @@ export default function PhotoCheckerPage() {
         {phase.kind === "result" && (
           <>
             <ResultLayout previewUrl={phase.previewUrl}>
-              <ResultPanel locale={locale} result={phase.result} t={t} />
+              <ResultPanel
+                locale={locale}
+                result={phase.result}
+                dimensions={phase.dimensions}
+                t={t}
+              />
             </ResultLayout>
             <div className="text-center">
               <button
@@ -295,24 +335,36 @@ function LoadingPanel({ label }: LoadingPanelProps) {
 interface ResultPanelProps {
   locale: Locale;
   result: PhotoCheckResult;
+  dimensions: CheckResult;
   t: (typeof STRINGS)[Locale];
 }
 
-function ResultPanel({ locale, result, t }: ResultPanelProps) {
+function ResultPanel({ locale, result, dimensions, t }: ResultPanelProps) {
+  // A dimensions "fail" (non-square / too small) is a hard CEAC blocker, so
+  // escalate the LLM's verdict if it was more lenient.
+  const effectiveOverall: PhotoCheckResult["overall"] =
+    dimensions.status === "fail" && result.overall === "pass"
+      ? "needs_work"
+      : result.overall;
+
   const overallLabel =
-    result.overall === "pass"
+    effectiveOverall === "pass"
       ? t.overallPass
-      : result.overall === "needs_work"
+      : effectiveOverall === "needs_work"
         ? t.overallNeedsWork
         : t.overallFail;
   const overallStatus: CheckStatus =
-    result.overall === "pass"
+    effectiveOverall === "pass"
       ? "pass"
-      : result.overall === "needs_work"
+      : effectiveOverall === "needs_work"
         ? "warning"
         : "fail";
 
   const checkKeys = Object.keys(result.checks) as CheckKey[];
+  const allFixes =
+    dimensions.status === "pass"
+      ? result.fixes
+      : [dimensions.note, ...result.fixes];
 
   return (
     <div className="space-y-5">
@@ -325,6 +377,19 @@ function ResultPanel({ locale, result, t }: ResultPanelProps) {
 
       <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-zinc-200">
         <ul className="divide-y divide-zinc-100">
+          <li className="flex gap-3 px-4 py-3">
+            <span
+              className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[dimensions.status]}`}
+            />
+            <div className="flex-1">
+              <div className="text-sm font-medium text-zinc-900">
+                {DIMENSION_LABEL[locale]}
+              </div>
+              <div className="mt-0.5 text-sm text-zinc-600">
+                {dimensions.note}
+              </div>
+            </div>
+          </li>
           {checkKeys.map((key) => {
             const c = result.checks[key];
             const label = CHECK_LABELS[key][locale];
@@ -349,11 +414,11 @@ function ResultPanel({ locale, result, t }: ResultPanelProps) {
         <div className="text-sm font-semibold text-zinc-900">
           {t.fixesTitle}
         </div>
-        {result.fixes.length === 0 ? (
+        {allFixes.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-600">{t.noFixes}</p>
         ) : (
           <ul className="mt-2 space-y-1.5 text-sm text-zinc-700">
-            {result.fixes.map((fix) => (
+            {allFixes.map((fix) => (
               <li key={fix} className="flex gap-2">
                 <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-400" />
                 <span>{fix}</span>
