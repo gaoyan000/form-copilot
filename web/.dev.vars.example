@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local `npm run preview` (wrangler dev).
+# For `npm run dev` (next dev), put the same values in .env.local instead.
+
+OPENAI_API_KEY=sk-...

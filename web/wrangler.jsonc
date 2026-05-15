@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "form-copilot-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-05-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+  // Set OPENAI_API_KEY:  npx wrangler secret put OPENAI_API_KEY
+  // Custom domain (formcopilot.net) configured in Cloudflare dashboard:
+  //   Workers & Pages → form-copilot-web → Settings → Domains & Routes
+}

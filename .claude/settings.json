@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s *)",
+      "Bash(curl -sI *)",
+      "Bash(curl -sL *)",
+      "Bash(/usr/bin/curl -s *)"
+    ]
+  }
+}
