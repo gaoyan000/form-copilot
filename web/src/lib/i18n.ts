@@ -21,9 +21,27 @@ export interface Strings {
   disclaimer: string;
   reqsTitle: string;
   reqs: string[];
+  sourceLabel: string;
+  sourceLinkText: string;
   fileTooBig: string;
   badType: string;
+  privacyNote: string;
+  feedbackPrompt: string;
+  feedbackUp: string;
+  feedbackDown: string;
+  feedbackCommentPlaceholder: string;
+  feedbackSubmit: string;
+  feedbackThanks: string;
+  emailPrompt: string;
+  emailPlaceholder: string;
+  emailSubmit: string;
+  emailThanks: string;
+  emailError: string;
+  emailInvalid: string;
 }
+
+export const SOURCE_URL =
+  "https://travel.state.gov/content/travel/en/us-visas/visa-information-resources/photos.html";
 
 export const STRINGS: Record<Locale, Strings> = {
   en: {
@@ -55,8 +73,26 @@ export const STRINGS: Record<Locale, Strings> = {
       "No glasses, hats, or shadows on face",
       "Sharp focus, taken within last 6 months",
     ],
+    sourceLabel:
+      "Checks are based on the official U.S. Department of State photo requirements:",
+    sourceLinkText: "travel.state.gov — Photo requirements",
     fileTooBig: "File is too large. Max 8 MB.",
     badType: "Unsupported file type. Use JPEG, PNG, or WebP.",
+    privacyNote:
+      "Your photo is not stored. It is sent to an AI model for this check and then discarded.",
+    feedbackPrompt: "Was this check helpful?",
+    feedbackUp: "Yes",
+    feedbackDown: "No",
+    feedbackCommentPlaceholder: "Anything we got wrong or could improve? (optional)",
+    feedbackSubmit: "Send feedback",
+    feedbackThanks: "Thanks for the feedback.",
+    emailPrompt:
+      "Want the full DS-160 copilot when it launches? Leave your email (optional).",
+    emailPlaceholder: "you@example.com",
+    emailSubmit: "Notify me",
+    emailThanks: "You're on the list. Thanks!",
+    emailError: "Couldn't save that. Please try again later.",
+    emailInvalid: "Please enter a valid email address.",
   },
   zh: {
     brand: "Form Copilot",
@@ -87,7 +123,23 @@ export const STRINGS: Record<Locale, Strings> = {
       "不戴眼镜、帽子，脸部无阴影",
       "对焦清晰，6 个月内拍摄",
     ],
+    sourceLabel: "检查标准依据美国国务院官方照片要求：",
+    sourceLinkText: "travel.state.gov — 照片要求",
     fileTooBig: "文件过大，上限 8 MB。",
     badType: "不支持的文件类型，请使用 JPEG、PNG 或 WebP。",
+    privacyNote:
+      "我们不会保存你的照片。照片仅发送给 AI 模型进行本次检查，随后即被丢弃。",
+    feedbackPrompt: "这次检查对你有帮助吗？",
+    feedbackUp: "有帮助",
+    feedbackDown: "没帮助",
+    feedbackCommentPlaceholder: "有哪里出错或可以改进？(选填)",
+    feedbackSubmit: "提交反馈",
+    feedbackThanks: "感谢你的反馈。",
+    emailPrompt: "想在完整版 DS-160 助手上线时收到通知？留下邮箱(选填)。",
+    emailPlaceholder: "you@example.com",
+    emailSubmit: "通知我",
+    emailThanks: "已加入名单，谢谢！",
+    emailError: "保存失败，请稍后再试。",
+    emailInvalid: "请输入有效的邮箱地址。",
   },
 };

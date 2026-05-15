@@ -11,7 +11,12 @@
   "observability": {
     "enabled": true
   }
-  // Set OPENAI_API_KEY:  npx wrangler secret put OPENAI_API_KEY
+  // Secrets (npx wrangler secret put <NAME>):
+  //   OPENAI_API_KEY      (required — photo check)
+  //   RESEND_API_KEY      (optional — email capture)
+  //   RESEND_AUDIENCE_ID  (optional — email capture)
+  // Plaintext vars (NEXT_PUBLIC_* must be set at BUILD time, not as secrets):
+  //   NEXT_PUBLIC_POSTHOG_KEY, NEXT_PUBLIC_POSTHOG_HOST
   // Custom domain (formcopilot.net) configured in Cloudflare dashboard:
   //   Workers & Pages → form-copilot-web → Settings → Domains & Routes
 }

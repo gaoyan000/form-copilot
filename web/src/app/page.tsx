@@ -9,7 +9,8 @@ import {
   type CheckStatus,
   type PhotoCheckResult,
 } from "@/lib/photo-prompt";
-import { STRINGS, type Locale } from "@/lib/i18n";
+import { STRINGS, SOURCE_URL, type Locale } from "@/lib/i18n";
+import { track } from "@/lib/analytics";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -92,6 +93,7 @@ export default function PhotoCheckerPage() {
       }
       const previewUrl = URL.createObjectURL(file);
       setPhase({ kind: "loading", previewUrl });
+      track("photo_uploaded", { locale });
 
       const dimensionsPromise = measureDimensions(file, locale);
 
@@ -110,14 +112,21 @@ export default function PhotoCheckerPage() {
           };
           const top = body.error ?? `Server error (${res.status})`;
           const message = body.detail ? `${top}: ${body.detail}` : top;
+          track("check_error", { stage: "http", status: res.status, locale });
           setPhase({ kind: "error", previewUrl, message });
           return;
         }
         const result = (await res.json()) as PhotoCheckResult;
         const dimensions = await dimensionsPromise;
+        track("check_completed", {
+          overall: result.overall,
+          dimensions: dimensions.status,
+          locale,
+        });
         setPhase({ kind: "result", previewUrl, result, dimensions });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Network error";
+        track("check_error", { stage: "network", locale });
         setPhase({ kind: "error", previewUrl, message });
       }
     },
@@ -166,13 +175,18 @@ export default function PhotoCheckerPage() {
         </section>
 
         {phase.kind === "idle" && (
-          <UploadZone
-            t={t}
-            dragOver={dragOver}
-            setDragOver={setDragOver}
-            inputRef={inputRef}
-            onFile={handleFile}
-          />
+          <div className="space-y-3">
+            <UploadZone
+              t={t}
+              dragOver={dragOver}
+              setDragOver={setDragOver}
+              inputRef={inputRef}
+              onFile={handleFile}
+            />
+            <p className="text-center text-xs text-zinc-500">
+              {t.privacyNote}
+            </p>
+          </div>
         )}
 
         {phase.kind === "loading" && (
@@ -191,6 +205,8 @@ export default function PhotoCheckerPage() {
                 t={t}
               />
             </ResultLayout>
+            <FeedbackWidget overall={phase.result.overall} t={t} />
+            <EmailCapture t={t} />
             <div className="text-center">
               <button
                 type="button"
@@ -229,6 +245,17 @@ export default function PhotoCheckerPage() {
               </li>
             ))}
           </ul>
+          <p className="mt-4 border-t border-zinc-100 pt-3 text-xs text-zinc-500">
+            {t.sourceLabel}{" "}
+            <a
+              href={SOURCE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-900"
+            >
+              {t.sourceLinkText}
+            </a>
+          </p>
         </section>
       </main>
 
@@ -426,7 +453,174 @@ function ResultPanel({ locale, result, dimensions, t }: ResultPanelProps) {
             ))}
           </ul>
         )}
+        <p className="mt-4 border-t border-zinc-100 pt-3 text-xs text-zinc-500">
+          {t.sourceLabel}{" "}
+          <a
+            href={SOURCE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-900"
+          >
+            {t.sourceLinkText}
+          </a>
+        </p>
       </div>
+    </div>
+  );
+}
+
+interface FeedbackWidgetProps {
+  overall: PhotoCheckResult["overall"];
+  t: (typeof STRINGS)[Locale];
+}
+
+function FeedbackWidget({ overall, t }: FeedbackWidgetProps) {
+  const [rating, setRating] = useState<"up" | "down" | null>(null);
+  const [comment, setComment] = useState("");
+  const [sent, setSent] = useState(false);
+
+  if (sent) {
+    return (
+      <div className="rounded-2xl bg-white p-4 text-sm text-zinc-600 ring-1 ring-zinc-200">
+        {t.feedbackThanks}
+      </div>
+    );
+  }
+
+  const submit = (finalRating: "up" | "down") => {
+    track("photo_feedback", {
+      rating: finalRating,
+      comment: comment.trim() || undefined,
+      overall,
+    });
+    setSent(true);
+  };
+
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium text-zinc-900">
+          {t.feedbackPrompt}
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setRating("up")}
+            className={`rounded-full px-3 py-1 text-sm ring-1 transition ${
+              rating === "up"
+                ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                : "text-zinc-600 ring-zinc-200 hover:bg-zinc-50"
+            }`}
+          >
+            {t.feedbackUp}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRating("down")}
+            className={`rounded-full px-3 py-1 text-sm ring-1 transition ${
+              rating === "down"
+                ? "bg-rose-50 text-rose-700 ring-rose-200"
+                : "text-zinc-600 ring-zinc-200 hover:bg-zinc-50"
+            }`}
+          >
+            {t.feedbackDown}
+          </button>
+        </div>
+      </div>
+      {rating !== null && (
+        <div className="mt-3 space-y-2">
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder={t.feedbackCommentPlaceholder}
+            rows={2}
+            maxLength={1000}
+            className="w-full rounded-lg border border-zinc-200 p-2 text-sm outline-none focus:border-zinc-400"
+          />
+          <button
+            type="button"
+            onClick={() => submit(rating)}
+            className="rounded-full bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-zinc-700"
+          >
+            {t.feedbackSubmit}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface EmailCaptureProps {
+  t: (typeof STRINGS)[Locale];
+}
+
+function EmailCapture({ t }: EmailCaptureProps) {
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState<
+    "idle" | "submitting" | "done" | "error" | "invalid"
+  >("idle");
+
+  if (state === "done") {
+    return (
+      <div className="rounded-2xl bg-white p-4 text-sm text-zinc-600 ring-1 ring-zinc-200">
+        {t.emailThanks}
+      </div>
+    );
+  }
+
+  const submit = async () => {
+    const trimmed = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setState("invalid");
+      return;
+    }
+    setState("submitting");
+    try {
+      const res = await fetch("/api/capture-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      if (!res.ok) {
+        setState("error");
+        return;
+      }
+      track("email_captured");
+      setState("done");
+    } catch {
+      setState("error");
+    }
+  };
+
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-zinc-200">
+      <p className="text-sm text-zinc-700">{t.emailPrompt}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (state === "invalid" || state === "error") setState("idle");
+          }}
+          placeholder={t.emailPlaceholder}
+          className="min-w-0 flex-1 rounded-lg border border-zinc-200 p-2 text-sm outline-none focus:border-zinc-400"
+        />
+        <button
+          type="button"
+          onClick={submit}
+          disabled={state === "submitting"}
+          className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+        >
+          {t.emailSubmit}
+        </button>
+      </div>
+      {state === "invalid" && (
+        <p className="mt-2 text-xs text-rose-600">{t.emailInvalid}</p>
+      )}
+      {state === "error" && (
+        <p className="mt-2 text-xs text-rose-600">{t.emailError}</p>
+      )}
     </div>
   );
 }

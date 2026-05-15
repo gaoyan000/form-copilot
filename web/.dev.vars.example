@@ -1,4 +1,13 @@
 # Copy to .dev.vars for local `npm run preview` (wrangler dev).
 # For `npm run dev` (next dev), put the same values in .env.local instead.
 
+# Required — photo check
 OPENAI_API_KEY=sk-...
+
+# Optional — analytics (site works without it; events become no-ops)
+NEXT_PUBLIC_POSTHOG_KEY=phc_...
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+
+# Optional — email capture (returns 503 if unset)
+RESEND_API_KEY=re_...
+RESEND_AUDIENCE_ID=00000000-0000-0000-0000-000000000000
